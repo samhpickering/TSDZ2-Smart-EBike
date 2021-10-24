@@ -187,6 +187,8 @@ static uint8_t apply_boost(uint8_t ui8_pas_cadence, uint16_t ui16_max_current_bo
 static void apply_boost_fade_out(uint16_t *ui16_adc_target_current);
 
 #define TORQUE_SENSOR_LINEARIZE_NR_POINTS 8
+#define TS_ADC_VALUE           0
+#define TS_ADC_INTERVAL_STEPS  1
 uint16_t ui16_torque_sensor_linearize_right[TORQUE_SENSOR_LINEARIZE_NR_POINTS][2];
 uint16_t ui16_torque_sensor_linearize_left[TORQUE_SENSOR_LINEARIZE_NR_POINTS][2];
 
@@ -791,11 +793,11 @@ static void communications_process_packages(uint8_t ui8_frame_type)
       }
 
       if (m_config_vars.ui8_torque_sensor_calibration_feature_enabled) {
-        if (ui16_torque_sensor_linearize_left[0][0] > ui16_g_adc_torque_sensor_min_value) {
-          ui16_g_adc_torque_sensor_min_value = ui16_torque_sensor_linearize_left[0][0];
+        if (ui16_torque_sensor_linearize_left[0][TS_ADC_VALUE] > ui16_g_adc_torque_sensor_min_value) {
+          ui16_g_adc_torque_sensor_min_value = ui16_torque_sensor_linearize_left[0][TS_ADC_VALUE];
         }
-        if (ui16_torque_sensor_linearize_right[0][0] > ui16_g_adc_torque_sensor_min_value) {
-          ui16_g_adc_torque_sensor_min_value = ui16_torque_sensor_linearize_right[0][0];
+        if (ui16_torque_sensor_linearize_right[0][TS_ADC_VALUE] > ui16_g_adc_torque_sensor_min_value) {
+          ui16_g_adc_torque_sensor_min_value = ui16_torque_sensor_linearize_right[0][TS_ADC_VALUE];
         }
       }
 
@@ -947,9 +949,6 @@ static void ebike_app_set_motor_max_current(uint8_t ui8_value)
 
 static void linearize_torque_sensor_to_kgs(uint16_t *ui16_adc_steps, uint16_t *ui16_weight_x10, uint8_t *ui8_pedal_right)
 {
-#define TS_ADC_VALUE           0
-#define TS_ADC_INTERVAL_STEPS  1
-
   uint16_t ui16_array_sum[TORQUE_SENSOR_LINEARIZE_NR_POINTS];
   uint8_t ui8_i;
   uint16_t ui16_adc_absolute;
