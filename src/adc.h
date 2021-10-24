@@ -23,5 +23,6 @@
 #define UI16_ADC_10_BIT_TORQUE_SENSOR     (((*(uint8_t*)(0x53E8)) << 2) | (*(uint8_t*)(0x53E9)))
 
 void adc_init(void);
+void adc_calibrate(void);
 
 #endif /* _ADC_H */

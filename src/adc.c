@@ -19,11 +19,6 @@ static void adc_trigger (void);
 
 void adc_init (void)
 {
-  uint16_t ui16_counter;
-  uint16_t ui16_adc_battery_current_offset;
-  uint16_t ui16_adc_torque_sensor_offset;
-  uint8_t ui8_i;
-
   //init GPIO for the used ADC pins
   GPIO_Init(GPIOB,
 	    (GPIO_PIN_7 | GPIO_PIN_6 | GPIO_PIN_5 | GPIO_PIN_3),
@@ -42,14 +37,20 @@ void adc_init (void)
 
   ADC1_ScanModeCmd(ENABLE);
   ADC1_Cmd(ENABLE);
+}
+
+void adc_calibrate (void)
+{
+  uint16_t ui16_counter;
+  uint16_t ui16_adc_battery_current_offset;
+  uint16_t ui16_adc_torque_sensor_offset;
+  uint8_t ui8_i;
 
   //********************************************************************************
   // next code is for "calibrating" the offset value of some ADC channels
 
   // 6s delay to wait for voltages stabilize (maybe beause capacitors on the circuit)
   // this was tested on 27.12.2019 by Casainho and lower values like 5s would not work.
-  ui16_counter = TIM3_GetCounter() + 6000;
-  while(TIM3_GetCounter() < ui16_counter) ;
 
   // read and discard few samples of ADC, to make sure the next samples are ok
   for(ui8_i = 0; ui8_i < 64; ui8_i++)

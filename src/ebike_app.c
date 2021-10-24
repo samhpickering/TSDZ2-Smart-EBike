@@ -54,6 +54,7 @@ volatile struct_config_vars m_config_vars;
 #define MOTOR_INIT_STATE_INIT_START_DELAY       2
 #define MOTOR_INIT_STATE_INIT_WAIT_DELAY        3
 #define MOTOR_INIT_OK                           4
+#define MOTOR_INIT_STATE_ADC_START_DELAY        5
 
 // Motor init status
 #define MOTOR_INIT_STATUS_RESET                 0
@@ -94,7 +95,7 @@ volatile uint8_t ui8_m_torque_sensor_weight_max = 0;
 static volatile uint16_t ui16_m_torque_sensor_adc_steps = 0;
 volatile uint16_t ui16_m_torque_sensor_raw = 0;
 volatile uint16_t ui16_m_adc_torque_sensor_raw = 0;
-volatile uint16_t ui16_g_adc_torque_sensor_min_value;
+volatile uint16_t ui16_g_adc_torque_sensor_min_value = 0;
 volatile uint8_t ui8_g_ebike_app_state = EBIKE_APP_STATE_MOTOR_STOP;
 uint16_t ui16_m_adc_battery_current_max;
 uint16_t ui16_m_adc_motor_current_max;
@@ -193,7 +194,7 @@ static uint8_t m_ui8_got_configurations_timer = 0;
 
 static uint8_t ui8_comm_error_counter = 0;
 
-volatile uint16_t ui16_g_adc_current_offset;
+volatile uint16_t ui16_g_adc_current_offset = 0;
 uint8_t ui8_m_adc_lights_current_offset; // lights current are measured on hardware with the same value as battery current
 
 // Measured on 2020.01.02 by Casainho, the following function takes about 35ms to execute
@@ -410,6 +411,10 @@ static void ebike_control_motor(void)
   // check if motor init delay has to be done
   switch (ui8_m_motor_init_state)
   {
+    case MOTOR_INIT_STATE_ADC_START_DELAY:
+      m_ui8_got_configurations_timer = 120;
+      ui8_m_motor_init_state = MOTOR_INIT_STATE_INIT_WAIT_DELAY;
+      break;
     case MOTOR_INIT_STATE_INIT_START_DELAY:
       m_ui8_got_configurations_timer = 40;
       ui8_m_motor_init_state = MOTOR_INIT_STATE_INIT_WAIT_DELAY;
@@ -421,6 +426,10 @@ static void ebike_control_motor(void)
       }
       else
       {
+        if (ui16_g_adc_torque_sensor_min_value == 0) {
+          adc_calibrate();
+        }
+
         ui8_m_motor_init_state = MOTOR_INIT_OK;
         ui8_m_motor_init_status = MOTOR_INIT_STATUS_INIT_OK;
         ui8_m_system_state &= ~ERROR_NOT_INIT;
@@ -767,18 +776,31 @@ static void communications_process_packages(uint8_t ui8_frame_type)
 
       // torque sensor calibration tables
       j = 16;
-      for (i = 0; i < 8; i++) {
+      for (i = 0; i < TORQUE_SENSOR_LINEARIZE_NR_POINTS; i++) {
         ui16_torque_sensor_linearize_left[i][0] = (uint16_t) ui8_rx_buffer[j++];
         ui16_torque_sensor_linearize_left[i][0] |= ((uint16_t) ui8_rx_buffer[j++]) << 8;
         ui16_torque_sensor_linearize_left[i][1] = (uint16_t) ui8_rx_buffer[j++];
         ui16_torque_sensor_linearize_left[i][1] |= ((uint16_t) ui8_rx_buffer[j++]) << 8;
       }
 
-      for (i = 0; i < 8; i++) {
+      for (i = 0; i < TORQUE_SENSOR_LINEARIZE_NR_POINTS; i++) {
         ui16_torque_sensor_linearize_right[i][0] = (uint16_t) ui8_rx_buffer[j++];
         ui16_torque_sensor_linearize_right[i][0] |= ((uint16_t) ui8_rx_buffer[j++]) << 8;
         ui16_torque_sensor_linearize_right[i][1] = (uint16_t) ui8_rx_buffer[j++];
         ui16_torque_sensor_linearize_right[i][1] |= ((uint16_t) ui8_rx_buffer[j++]) << 8;
+      }
+
+      if (m_config_vars.ui8_torque_sensor_calibration_feature_enabled) {
+        if (ui16_torque_sensor_linearize_left[0][0] > ui16_g_adc_torque_sensor_min_value) {
+          ui16_g_adc_torque_sensor_min_value = ui16_torque_sensor_linearize_left[0][0];
+        }
+        if (ui16_torque_sensor_linearize_right[0][0] > ui16_g_adc_torque_sensor_min_value) {
+          ui16_g_adc_torque_sensor_min_value = ui16_torque_sensor_linearize_right[0][0];
+        }
+      }
+
+      if (ui16_g_adc_torque_sensor_min_value == 0) {
+        ui8_m_motor_init_state = MOTOR_INIT_STATE_ADC_START_DELAY;
       }
 
       // battery current min ADC
