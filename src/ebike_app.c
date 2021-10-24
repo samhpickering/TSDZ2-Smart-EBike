@@ -187,8 +187,8 @@ static uint8_t apply_boost(uint8_t ui8_pas_cadence, uint16_t ui16_max_current_bo
 static void apply_boost_fade_out(uint16_t *ui16_adc_target_current);
 
 #define TORQUE_SENSOR_LINEARIZE_NR_POINTS 8
-#define TS_ADC_VALUE           0
-#define TS_ADC_INTERVAL_STEPS  1
+#define TS_ADC_WEIGHT_X10      0
+#define TS_ADC_VALUE           1
 uint16_t ui16_torque_sensor_linearize_right[TORQUE_SENSOR_LINEARIZE_NR_POINTS][2];
 uint16_t ui16_torque_sensor_linearize_left[TORQUE_SENSOR_LINEARIZE_NR_POINTS][2];
 
@@ -947,75 +947,44 @@ static void ebike_app_set_motor_max_current(uint8_t ui8_value)
   }
 }
 
+
 static void linearize_torque_sensor_to_kgs(uint16_t *ui16_adc_steps, uint16_t *ui16_weight_x10, uint8_t *ui8_pedal_right)
 {
-  uint16_t ui16_array_sum[TORQUE_SENSOR_LINEARIZE_NR_POINTS];
   uint8_t ui8_i;
   uint16_t ui16_adc_absolute;
   uint16_t (*ui16_array_linear)[2];
-  uint32_t ui32_temp = 0;
+  uint32_t ui32_weight_x10 = 0;
+  uint16_t ui16_slope_x1000 = 0;
   uint16_t _ui16_adc_steps = *ui16_adc_steps;
   uint8_t _ui8_pedal_right = *ui8_pedal_right;
-
-  memset(ui16_array_sum, 0, sizeof(ui16_array_sum));
 
   if (_ui8_pedal_right)
     ui16_array_linear = ui16_torque_sensor_linearize_right;
   else
     ui16_array_linear = ui16_torque_sensor_linearize_left;
 
+  *ui16_weight_x10 = 0;
+
   if (_ui16_adc_steps > 0)
   {
     ui16_adc_absolute = _ui16_adc_steps + ui16_g_adc_torque_sensor_min_value;
 
-    for (ui8_i = 0; ui8_i < (TORQUE_SENSOR_LINEARIZE_NR_POINTS - 1); ui8_i++)
+    for (ui8_i = 0; ui8_i < TORQUE_SENSOR_LINEARIZE_NR_POINTS - 1; ui8_i++)
     {
       // value is under interval max value
-      if (ui16_adc_absolute < ui16_array_linear[ui8_i + 1][TS_ADC_VALUE])
+      if ((ui16_adc_absolute >= ui16_array_linear[ui8_i][TS_ADC_VALUE]
+          && ui16_adc_absolute < ui16_array_linear[ui8_i + 1][TS_ADC_VALUE])
+          || ui8_i == TORQUE_SENSOR_LINEARIZE_NR_POINTS - 2)
       {
-        // first
-        if (ui8_i == 0)
-        {
-          ui16_array_sum[ui8_i] = _ui16_adc_steps;
-        }
-        else
-        {
-          ui16_array_sum[ui8_i] = ui16_adc_absolute - ui16_array_linear[ui8_i][TS_ADC_VALUE];
-        }
+        ui16_slope_x1000 = ((ui16_array_linear[ui8_i + 1][TS_ADC_WEIGHT_X10] - ui16_array_linear[ui8_i][TS_ADC_WEIGHT_X10]) * 100)
+                          / (ui16_array_linear[ui8_i + 1][TS_ADC_VALUE] - ui16_array_linear[ui8_i][TS_ADC_VALUE]);
+
+        *ui16_weight_x10 = ui16_array_linear[ui8_i][TS_ADC_WEIGHT_X10] + ((ui16_adc_absolute - ui16_array_linear[ui8_i][TS_ADC_VALUE]) * ui16_slope_x1000) / 100; 
 
         // exit the for loop as this was the last interval
         break;
       }
-      // current value is over current interval
-      else
-      {
-        ui16_array_sum[ui8_i] = ui16_array_linear[ui8_i + 1][TS_ADC_VALUE] - ui16_array_linear[ui8_i][TS_ADC_VALUE];
-      }
     }
-
-    // count values under min value of array linear
-    if (ui16_g_adc_torque_sensor_min_value < ui16_array_linear[0][TS_ADC_VALUE])
-      ui16_array_sum[0] += (ui16_array_linear[0][TS_ADC_VALUE] - ui16_g_adc_torque_sensor_min_value);
-
-    // count with the values over max value of array linear
-    if (ui16_adc_absolute > ui16_array_linear[7][TS_ADC_VALUE])
-      ui16_array_sum[7] = ui16_adc_absolute - ui16_array_linear[7][TS_ADC_VALUE];
-
-    // sum the total parcels
-    for (ui8_i = 0; ui8_i < TORQUE_SENSOR_LINEARIZE_NR_POINTS - 1; ui8_i++)
-    {
-      ui32_temp += ((uint32_t) ui16_array_sum[ui8_i] * (uint32_t) ui16_array_linear[ui8_i + 1][TS_ADC_INTERVAL_STEPS]);
-    }
-
-    // sum the last parcel
-    ui32_temp += ((uint32_t) ui16_array_sum[7] * (uint32_t) ui16_array_linear[7][TS_ADC_INTERVAL_STEPS]);
-
-    *ui16_weight_x10 = (uint16_t) (ui32_temp / 10);
-  }
-  // no torque_sensor_adc_steps
-  else
-  {
-    *ui16_weight_x10 = 0;
   }
 }
 
