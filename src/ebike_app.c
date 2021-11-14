@@ -573,13 +573,13 @@ static void communications_process_packages(uint8_t ui8_frame_type)
       m_config_vars.ui8_walk_assist = (ui8_rx_buffer[5] & (1 << 1)) ? 1: 0;
 
       // battery max power target
-      m_config_vars.ui8_target_battery_max_power_div25 = ui8_rx_buffer[6];
+      m_config_vars.ui8_target_battery_max_power_div25 = (ui8_rx_buffer[6] > 10) ? 10 : ui8_rx_buffer[6];
 
       // startup motor power boost
       m_config_vars.ui16_startup_motor_power_boost_assist_level = (((uint16_t) ui8_rx_buffer[8]) << 8) + ((uint16_t) ui8_rx_buffer[7]);
 
       // wheel max speed
-      m_config_vars.ui8_wheel_max_speed = ui8_rx_buffer[9];
+      m_config_vars.ui8_wheel_max_speed = (ui8_rx_buffer[9] > 25) ? 25 : ui8_rx_buffer[9];
 
       // motor temperature limit function or throttle
       m_config_vars.ui8_temperature_limit_feature_enabled = ui8_rx_buffer[10];
