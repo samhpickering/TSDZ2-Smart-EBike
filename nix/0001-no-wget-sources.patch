@@ -1,0 +1,11 @@
+diff --git a/patch_binutils.sh b/patch_binutils.sh
+index b5c621c..b0042e9 100755
+--- a/patch_binutils.sh
++++ b/patch_binutils.sh
+@@ -1,6 +1,4 @@
+ #!/bin/sh
+-wget -nc https://ftp.gnu.org/gnu/binutils/binutils-2.30.tar.xz
+-wget -nc https://ftp.gnu.org/gnu/gdb/gdb-8.1.tar.xz
+ mkdir -p binutils-2.30
+ tar -xvf gdb-8.1.tar.xz --strip-components=1 --directory=binutils-2.30
+ tar -xvf binutils-2.30.tar.xz
